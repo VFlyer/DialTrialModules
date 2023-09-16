@@ -94,7 +94,7 @@ public class CruelDialTrialScript : MonoBehaviour
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++)
                 for (int k = 0; k < 4; k++)
-                    if (Numbers[k][0] + Numbers[0][3] + Numbers[i][1] + Numbers[j][2] == sum && Numbers[(k + 1) % 4][0] + Numbers[1][3] + Numbers[(i + 1) % 4][1] + Numbers[(j + 1) % 4][2] == sum && Numbers[(k + 2) % 4][0] + Numbers[2][3] + Numbers[(i + 2) % 4][1] + Numbers[(j + 1) % 4][2] == sum && Numbers[(k + 3) % 4][0] + Numbers[3][3] + Numbers[(i + 3) % 4][1] + Numbers[(j + 3) % 4][2] == sum && (i != 0 || j != 0 || k != 0))
+                    if (Numbers[k][0] + Numbers[0][3] + Numbers[i][1] + Numbers[j][2] == sum && Numbers[(k + 1) % 4][0] + Numbers[1][3] + Numbers[(i + 1) % 4][1] + Numbers[(j + 1) % 4][2] == sum && Numbers[(k + 2) % 4][0] + Numbers[2][3] + Numbers[(i + 2) % 4][1] + Numbers[(j + 2) % 4][2] == sum && Numbers[(k + 3) % 4][0] + Numbers[3][3] + Numbers[(i + 3) % 4][1] + Numbers[(j + 3) % 4][2] == sum && (i != 0 || j != 0 || k != 0))
                         goto restart;
         for (int i = 0; i < 4; i++)
             if (Numbers[0][i] == Numbers[2][i] && Numbers[1][i] == Numbers[3][i])
@@ -285,21 +285,61 @@ public class CruelDialTrialScript : MonoBehaviour
             catch { }
             ButtonPressAnim = StartCoroutine(SubmitButtonAnim());
             Audio.PlaySoundAtTransform("press", Buttons[pos].transform);
-            if (Positions.Sum() == 0 && !Solved)
+            if (!Solved)
             {
-                Module.HandlePass();
-                StartCoroutine(SolveAnim());
-                Audio.PlaySoundAtTransform("solve", Buttons[3].transform);
-                Debug.LogFormat("[Cruel Dial Trial #{0}] You submitted the correct permutation of the dials. Module solved!", _moduleID);
-                for (int i = 0; i < 4; i++)
-                    foreach (MeshRenderer symbol in BaseSymbolParents[i].GetComponentsInChildren<MeshRenderer>())
-                        symbol.material.color = new Color(0, 0, 0, 1);
-                Solved = true;
-            }
-            else if (!Solved)
-            {
-                Module.HandleStrike();
-                Debug.LogFormat("[Cruel Dial Trial #{0}] You submitted an incorrect permutation of the dials. Strike!", _moduleID);
+                var intendedSolution = Positions.Sum() == 0;
+                var curSums = new int[4];
+                var shiftableDials = new List<int> { 1, 2, 3 };
+                if (!intendedSolution)
+                {
+                    Debug.LogFormat("[Dial Trial #{0}] You submitted an unintended permutation of the dials, is that correct?", _moduleID);
+                    for (var x = 0; x < 4; x++)
+                    {
+                        var idxShiftable = shiftableDials.IndexOf(x);
+                        var curQuadrantSums = Numbers[x];
+                        if (idxShiftable != -1)
+                        {
+                            var shiftFactor = Positions[idxShiftable];
+                            curQuadrantSums = curQuadrantSums.Skip(shiftFactor).Concat(curQuadrantSums.Take(shiftFactor)).ToList();
+                        }
+                        for (var y = 0; y < 4; y++)
+                            curSums[y] += curQuadrantSums[y];
+                    }
+                    var numsLogged = new List<List<int>>();
+                    for (var x = 0; x < 4; x++)
+                    {
+                        var idxShiftable = shiftableDials.IndexOf(x);
+                        var curQuadrantSums = Numbers[x];
+                        if (idxShiftable != -1)
+                        {
+                            var shiftFactor = Positions[idxShiftable];
+                            curQuadrantSums = curQuadrantSums.Skip(shiftFactor).Concat(curQuadrantSums.Take(shiftFactor)).ToList();
+                        }
+                        numsLogged.Add(curQuadrantSums);
+                    }
+                    for (var x = 0; x < 4; x++)
+                        Debug.LogFormat("[Dial Trial #{0}] Quadrant {1} has the following values: {2}", _moduleID, x + 1, numsLogged.Select(a => a[x]).Join(", "));
+                    Debug.LogFormat("[Dial Trial #{0}] The sums of each of the four quadrants are {1}", _moduleID, curSums.Join(", "));
+                }
+                if (intendedSolution || curSums.Distinct().Count() == 1)
+                {
+                    Module.HandlePass();
+                    StartCoroutine(SolveAnim());
+                    Audio.PlaySoundAtTransform("solve", Buttons[2].transform);
+                    if (intendedSolution)
+                        Debug.LogFormat("[Dial Trial #{0}] You submitted the intented correct permutation of the dials. Module solved!", _moduleID);
+                    else
+                        Debug.LogFormat("[Dial Trial #{0}] The permutation of the dials set is correct. Module solved!", _moduleID);
+                    for (int i = 0; i < 4; i++)
+                        foreach (MeshRenderer symbol in BaseSymbolParents[i].GetComponentsInChildren<MeshRenderer>())
+                            symbol.material.color = new Color(0, 0, 0, 1);
+                    Solved = true;
+                }
+                else
+                {
+                    Module.HandleStrike();
+                    Debug.LogFormat("[Dial Trial #{0}] You submitted an incorrect permutation of the dials. Strike!", _moduleID);
+                }
             }
         }
     }
